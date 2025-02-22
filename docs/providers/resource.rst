@@ -210,6 +210,72 @@ first argument.
 
 .. _resource-provider-wiring-closing:
 
+Scoping Resources using specialized subclasses
+----------------------------------------------
+
+You can use specialized subclasses of ``Resource`` provider to initialize and shutdown resources by type.
+Allowing for example to only initialize a subgroup of resources.
+
+.. code-block:: python
+
+   class ScopedResource(resources.Resource):
+       pass
+
+   def init_service(name) -> Service:
+      print(f"Init {name}")
+      yield Service()
+      print(f"Shutdown {name}")
+
+   class Container(containers.DeclarativeContainer):
+
+       scoped = ScopedResource(
+           init_service,
+           "scoped",
+       )
+
+       generic = providers.Resource(
+           init_service,
+           "generic",
+       )
+
+
+To initialize resources by type you can use ``init_resources(resource_type)`` and ``shutdown_resources(resource_type)``
+methods adding the resource type as an argument:
+
+.. code-block:: python
+
+   def main():
+       container = Container()
+       container.init_resources(ScopedResource)
+       #  Generates:
+       # >>> Init scoped
+
+       container.shutdown_resources(ScopedResource)
+       #  Generates:
+       # >>> Shutdown scoped
+
+
+And to initialize all resources you can use ``init_resources()`` and ``shutdown_resources()`` without arguments:
+
+.. code-block:: python
+
+   def main():
+       container = Container()
+       container.init_resources()
+       #  Generates:
+       # >>> Init scoped
+       # >>> Init generic
+
+       container.shutdown_resources()
+       #  Generates:
+       # >>> Shutdown scoped
+       # >>> Shutdown generic
+
+
+It works using the :ref:`traverse` method to find all resources of the specified type, selecting all resources
+which are instances of the specified type.
+
+
 Resources, wiring, and per-function execution scope
 ---------------------------------------------------
 
