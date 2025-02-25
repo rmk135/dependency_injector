@@ -145,3 +145,121 @@ async def test_shutdown_sync_and_async_ordering():
     await container.shutdown_resources()
     assert initialized_resources == ["r1", "r2", "r3", "r1", "r2", "r3"]
     assert shutdown_resources == ["r3", "r2", "r1", "r3", "r2", "r1"]
+
+
+@mark.asyncio
+async def test_init_and_shutdown_scoped_resources():
+    initialized_resources = []
+    shutdown_resources = []
+
+    def _sync_resource(name, **_):
+        initialized_resources.append(name)
+        yield name
+        shutdown_resources.append(name)
+
+    async def _async_resource(name, **_):
+        initialized_resources.append(name)
+        yield name
+        shutdown_resources.append(name)
+
+
+    class ResourceA(providers.Resource):
+        pass
+
+
+    class ResourceB(providers.Resource):
+        pass
+
+
+    class Container(containers.DeclarativeContainer):
+        resource_a = ResourceA(
+            _sync_resource,
+            name="ra1",
+        )
+        resource_b1 = ResourceB(
+            _sync_resource,
+            name="rb1",
+            r1=resource_a,
+        )
+        resource_b2 = ResourceB(
+            _async_resource,
+            name="rb2",
+            r2=resource_b1,
+        )
+
+    container = Container()
+
+    container.init_resources(resource_type=ResourceA)
+    assert initialized_resources == ["ra1"]
+    assert shutdown_resources == []
+
+    container.shutdown_resources(resource_type=ResourceA)
+    assert initialized_resources == ["ra1"]
+    assert shutdown_resources == ["ra1"]
+
+    await container.init_resources(resource_type=ResourceB)
+    assert initialized_resources == ["ra1", "ra1", "rb1", "rb2"]
+    assert shutdown_resources == ["ra1"]
+
+    await container.shutdown_resources(resource_type=ResourceB)
+    assert initialized_resources == ["ra1", "ra1", "rb1", "rb2"]
+    assert shutdown_resources == ["ra1", "rb2", "rb1"]
+
+
+@mark.asyncio
+async def test_init_and_shutdown_all_scoped_resources_using_default_value():
+    initialized_resources = []
+    shutdown_resources = []
+
+    def _sync_resource(name, **_):
+        initialized_resources.append(name)
+        yield name
+        shutdown_resources.append(name)
+
+    async def _async_resource(name, **_):
+        initialized_resources.append(name)
+        yield name
+        shutdown_resources.append(name)
+
+
+    class ResourceA(providers.Resource):
+        pass
+
+
+    class ResourceB(providers.Resource):
+        pass
+
+
+    class Container(containers.DeclarativeContainer):
+        resource_a = ResourceA(
+            _sync_resource,
+            name="r1",
+        )
+        resource_b1 = ResourceB(
+            _sync_resource,
+            name="r2",
+            r1=resource_a,
+        )
+        resource_b2 = ResourceB(
+            _async_resource,
+            name="r3",
+            r2=resource_b1,
+        )
+
+    container = Container()
+
+    await container.init_resources()
+    assert initialized_resources == ["r1", "r2", "r3"]
+    assert shutdown_resources == []
+
+    await container.shutdown_resources()
+    assert initialized_resources == ["r1", "r2", "r3"]
+    assert shutdown_resources == ["r3", "r2", "r1"]
+
+    await container.init_resources()
+    assert initialized_resources == ["r1", "r2", "r3", "r1", "r2", "r3"]
+    assert shutdown_resources == ["r3", "r2", "r1"]
+
+    await container.shutdown_resources()
+    assert initialized_resources == ["r1", "r2", "r3", "r1", "r2", "r3"]
+    assert shutdown_resources == ["r3", "r2", "r1", "r3", "r2", "r1"]
