@@ -70,6 +70,11 @@ try:
 except ImportError:
     werkzeug = None
 
+try:
+    import fast_depends.dependencies
+except ImportError:
+    fast_depends = None
+
 
 from . import providers
 
@@ -735,8 +740,7 @@ def _get_patched(
 
 
 def _is_fastapi_depends(param: Any) -> bool:
-    return fastapi and isinstance(param, fastapi.params.Depends)
-
+    return (fastapi and isinstance(param, fastapi.params.Depends)) or (fast_depends and isinstance(param, fast_depends.dependencies.Depends))
 
 def _is_patched(fn) -> bool:
     return _patched_registry.has_callable(fn)
